@@ -1,0 +1,14 @@
+{
+  "name": "kakimoni-layout",
+  "version": "1.0.0",
+  "description": "KakiMoni レイアウト専用機アプリ",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-packager . KakiMoni_Layout --platform=win32 --arch=x64 --out=dist --overwrite --asar"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-packager": "^17.0.0"
+  }
+}

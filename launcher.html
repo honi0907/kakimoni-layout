@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>KakiMoni レイアウト専用機</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Montserrat', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 16px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+  }
+  h2 { font-size: 1rem; color: #fbbf24; }
+  .section {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .section-title { font-size: 0.75rem; color: #64748b; font-weight: bold; letter-spacing: 0.05em; }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  label { font-size: 0.75rem; color: #94a3b8; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  input[type=text] {
+    flex: 1;
+    padding: 6px 9px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    min-width: 0;
+  }
+  select {
+    padding: 6px 8px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.82rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .btn {
+    padding: 7px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .btn-yellow  { background: #b45309; color: #fef3c7; }
+  .btn-yellow:hover { background: #92400e; }
+  .btn-slate   { background: #334155; color: #e2e8f0; }
+  .btn-slate:hover { background: #475569; }
+  .btn-green   { background: #15803d; color: #fff; }
+  .btn-green:hover { background: #166534; }
+  .btn-red     { background: #b91c1c; color: #fff; }
+  .btn-red:hover { background: #991b1b; }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .slot-label {
+    font-size: 0.7rem; font-weight: bold; letter-spacing: 0.07em;
+    color: #fbbf24; padding: 2px 6px; background: #1a1a0a;
+    border: 1px solid #92400e; border-radius: 3px; white-space: nowrap;
+  }
+  .slot-label.slot2 { color: #a78bfa; border-color: #5b21b6; background: #0d0b1a; }
+  .slot-label.ctrl  { color: #34d399; border-color: #065f46; background: #021a10; }
+  .btn-teal  { background: #0f766e; color: #ccfbf1; }
+  .btn-teal:hover { background: #115e59; }
+  .url-hint {
+    font-size: 0.68rem; color: #475569; padding: 3px 7px;
+    background: #0f172a; border-radius: 4px; word-break: break-all;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .url-hint span { color: #7dd3fc; }
+
+  /* ── 2カラムグリッド ── */
+  #server-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  #server-row .server-url-field { flex: 1; min-width: 0; }
+  #slots-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  /* コントロール行：横並び */
+  #ctrl-section {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+  #ctrl-section .ctrl-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+  #ctrl-section .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #ctrl-section .btn { flex-shrink: 0; }
+</style>
+</head>
+<body>
+<h2>📺 KakiMoni レイアウト専用機</h2>
+
+<!-- サーバー接続先 -->
+<div class="section" style="flex-direction:row;align-items:flex-end;gap:8px;padding:10px 12px">
+  <div class="field" style="flex:1;min-width:0">
+    <div class="section-title" style="margin-bottom:2px">接続先サーバー</div>
+    <input type="text" id="serverUrl" placeholder="http://192.168.1.10:3000">
+  </div>
+  <button class="btn btn-yellow" id="btnRefreshDisplays" style="flex-shrink:0">🖥 モニター更新</button>
+</div>
+
+<!-- レイアウト機 更新 -->
+<div class="section" style="padding:10px 12px">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <div class="section-title" style="margin:0">レイアウト機 更新（親サーバー配信）</div>
+    <div id="updateVersionInfo" style="font-size:0.72rem;color:#64748b">現在: -</div>
+  </div>
+  <div class="row" style="gap:8px">
+    <button class="btn btn-slate" id="btnCheckUpdate" style="flex:1">更新を確認</button>
+    <button class="btn btn-green" id="btnApplyUpdate" style="flex:1" disabled>更新して再起動</button>
+  </div>
+  <div id="updateStatus" class="url-hint">状態: 未確認</div>
+</div>
+
+<!-- スロット 1 / 2：横並び -->
+<div id="slots-grid">
+
+  <!-- ディスプレイ1 -->
+  <div class="section">
+    <div class="row">
+      <span class="slot-label">ディスプレイ 1</span>
+      <span style="font-size:0.72rem;color:#64748b">表示ウィンドウ</span>
+    </div>
+    <div class="field">
+      <label>使用モニター</label>
+      <select id="display0" title="ディスプレイ1の使用モニター"></select>
+    </div>
+    <div class="url-hint" id="hint0">URL: <span>―</span></div>
+    <button class="btn btn-green" id="btnSlot0" style="width:100%">📺 ディスプレイ1 を開く</button>
+  </div>
+
+  <!-- ディスプレイ2 -->
+  <div class="section">
+    <div class="row">
+      <span class="slot-label slot2">ディスプレイ 2</span>
+      <span style="font-size:0.72rem;color:#64748b">表示ウィンドウ</span>
+    </div>
+    <div class="field">
+      <label>使用モニター</label>
+      <select id="display1" title="ディスプレイ2の使用モニター"></select>
+    </div>
+    <div class="url-hint" id="hint1">URL: <span>―</span></div>
+    <button class="btn btn-green" id="btnSlot1" style="width:100%">📺 ディスプレイ2 を開く</button>
+  </div>
+
+</div>
+
+<!-- コントロール画面：横1行 -->
+<div class="section" id="ctrl-section">
+  <div class="ctrl-left">
+    <div class="ctrl-row">
+      <span class="slot-label ctrl">コントロール</span>
+      <span style="font-size:0.72rem;color:#64748b">レイアウト編集＋子機プレビュー</span>
+    </div>
+    <div class="url-hint" id="hintCtrl">URL: <span>―</span></div>
+  </div>
+  <button class="btn btn-teal" id="btnControl">📐 コントロール画面を開く</button>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron');
+
+let displays = [];
+const slotOpen = [false, false];
+// スロット1 → slot1, スロット2 → slot2 に固定
+const SLOT_GROUPS = ['slot1', 'slot2'];
+let pendingLayoutUpdate = null;
+
+// 前回設定を復元
+const saved = {
+  serverUrl: localStorage.getItem('layout_serverUrl') || 'http://localhost:3000',
+  display0:  parseInt(localStorage.getItem('layout_display0') || '0'),
+  display1:  parseInt(localStorage.getItem('layout_display1') || '1'),
+};
+document.getElementById('serverUrl').value = saved.serverUrl;
+
+// モニター一覧取得
+async function refreshDisplays() {
+  displays = await ipcRenderer.invoke('get-displays');
+  [0, 1].forEach(i => {
+    const sel = document.getElementById(`display${i}`);
+    sel.innerHTML = '';
+    displays.forEach((d, idx) => {
+      const opt = document.createElement('option');
+      opt.value = idx;
+      opt.textContent = d.label + (d.isPrimary ? '（プライマリ）' : '');
+      sel.appendChild(opt);
+    });
+    const defaultIdx = i === 0 ? saved.display0 : saved.display1;
+    sel.value = Math.min(defaultIdx, displays.length - 1);
+  });
+  updateHints();
+}
+
+function buildUrl(slot) {
+  const base  = (document.getElementById('serverUrl').value || '').trim().replace(/\/$/, '');
+  const group = SLOT_GROUPS[slot];
+  if (!base) return '';
+  return `${base}/host-display?group=${encodeURIComponent(group)}`;
+}
+
+function updateHints() {
+  [0, 1].forEach(i => {
+    const url = buildUrl(i);
+    const el  = document.getElementById(`hint${i}`);
+    el.innerHTML = 'URL: <span>' + (url || '―') + '</span>';
+  });
+}
+
+// 入力変更でヒント更新
+['serverUrl'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateHints);
+});
+
+// コントロール画面の URL 生成
+function buildControlUrl() {
+  const base = (document.getElementById('serverUrl').value || '').trim().replace(/\/$/, '');
+  return base ? `${base}/layout-control/` : '';
+}
+function updateControlHint() {
+  const url = buildControlUrl();
+  document.getElementById('hintCtrl').innerHTML = 'URL: <span>' + (url || '―') + '</span>';
+}
+document.getElementById('serverUrl').addEventListener('input', updateControlHint);
+updateControlHint();
+
+// コントロール画面を開く
+let controlOpen = false;
+document.getElementById('btnControl').addEventListener('click', () => {
+  const url = buildControlUrl();
+  if (!url) return;
+  localStorage.setItem('layout_serverUrl', document.getElementById('serverUrl').value.trim());
+  ipcRenderer.send('toggle-control', { url });
+});
+ipcRenderer.on('control-status', (e, open) => {
+  controlOpen = open;
+  const btn = document.getElementById('btnControl');
+  btn.textContent = open ? '✓ コントロール画面を前に出す' : '📐 コントロール画面を開く';
+});
+
+// モニター更新ボタン
+document.getElementById('btnRefreshDisplays').addEventListener('click', refreshDisplays);
+
+async function refreshCurrentVersion() {
+  try {
+    // バージョン表示はメイン側の app.getVersion を使えないため、package.json を基準にする
+    const pkg = require('./package.json');
+    document.getElementById('updateVersionInfo').textContent = `現在: v${pkg.version || '-'}`;
+  } catch {
+    document.getElementById('updateVersionInfo').textContent = '現在: -';
+  }
+}
+
+document.getElementById('btnCheckUpdate').addEventListener('click', async () => {
+  const serverUrl = (document.getElementById('serverUrl').value || '').trim();
+  const statusEl = document.getElementById('updateStatus');
+  const applyBtn = document.getElementById('btnApplyUpdate');
+
+  pendingLayoutUpdate = null;
+  applyBtn.disabled = true;
+  statusEl.textContent = '状態: 更新を確認中...';
+
+  const result = await ipcRenderer.invoke('check-layout-update', { serverUrl });
+  if (!result || !result.ok) {
+    statusEl.textContent = `状態: 確認失敗 (${result?.error || 'unknown error'})`;
+    return;
+  }
+
+  if (!result.available) {
+    statusEl.textContent = `状態: 最新です (現在 ${result.currentVersion} / 最新 ${result.latestVersion})`;
+    return;
+  }
+
+  pendingLayoutUpdate = result;
+  applyBtn.disabled = false;
+  statusEl.textContent = `状態: 更新あり ${result.currentVersion} -> ${result.latestVersion}`;
+});
+
+document.getElementById('btnApplyUpdate').addEventListener('click', async () => {
+  if (!pendingLayoutUpdate) return;
+
+  const serverUrl = (document.getElementById('serverUrl').value || '').trim();
+  const statusEl = document.getElementById('updateStatus');
+  const applyBtn = document.getElementById('btnApplyUpdate');
+  applyBtn.disabled = true;
+
+  statusEl.textContent = '状態: 更新ファイルをダウンロード中...';
+  const dl = await ipcRenderer.invoke('download-layout-update', {
+    serverUrl,
+    fileName: pendingLayoutUpdate.fileName,
+    downloadPath: pendingLayoutUpdate.downloadPath,
+    sha256: pendingLayoutUpdate.sha256,
+  });
+  if (!dl || !dl.ok) {
+    statusEl.textContent = `状態: ダウンロード失敗 (${dl?.error || 'unknown error'})`;
+    applyBtn.disabled = false;
+    return;
+  }
+
+  statusEl.textContent = '状態: 更新適用中...';
+  const ap = await ipcRenderer.invoke('apply-layout-update', { downloadedPath: dl.downloadedPath });
+  if (!ap || !ap.ok) {
+    statusEl.textContent = `状態: 更新失敗 (${ap?.error || 'unknown error'})`;
+    applyBtn.disabled = false;
+    return;
+  }
+
+  statusEl.textContent = '状態: 再起動します...';
+});
+
+// 各スロットの開く／閉じるボタン
+[0, 1].forEach(slot => {
+  document.getElementById(`btnSlot${slot}`).addEventListener('click', () => {
+    const url          = buildUrl(slot);
+    const displayIndex = parseInt(document.getElementById(`display${slot}`).value || '0');
+    // 設定保存
+    localStorage.setItem('layout_serverUrl', document.getElementById('serverUrl').value.trim());
+    localStorage.setItem(`layout_display${slot}`, displayIndex);
+    ipcRenderer.send('toggle-display', { slot, url, displayIndex });
+  });
+});
+
+// ステータス反映
+ipcRenderer.on('display-status', (e, { slot, open }) => {
+  slotOpen[slot] = open;
+  const btn = document.getElementById(`btnSlot${slot}`);
+  if (open) {
+    btn.textContent = `✕ スロット${slot + 1} を閉じる`;
+    btn.className   = 'btn btn-red';
+  } else {
+    btn.textContent = `📺 スロット${slot + 1} を開く`;
+    btn.className   = 'btn btn-green';
+    updateHints();
+  }
+});
+
+// 起動時にモニター一覧取得
+refreshDisplays();
+refreshCurrentVersion();
+</script>
+</body>
+</html>
