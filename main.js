@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -235,6 +235,20 @@ ipcMain.handle('get-failover-server-defaults', () => {
 });
 
 ipcMain.handle('get-failover-server-status', () => ({ ...failoverServerState }));
+
+ipcMain.handle('pick-failover-server-root', async (event, payload = {}) => {
+  const defaultPath = String(payload.defaultPath || guessDefaultServerRoot());
+  const result = await dialog.showOpenDialog({
+    title: 'サブサーバーフォルダを選択',
+    defaultPath,
+    properties: ['openDirectory'],
+  });
+
+  if (result.canceled || !Array.isArray(result.filePaths) || result.filePaths.length === 0) {
+    return { ok: false, canceled: true };
+  }
+  return { ok: true, path: result.filePaths[0] };
+});
 
 ipcMain.handle('start-failover-server', async (event, payload = {}) => {
   try {

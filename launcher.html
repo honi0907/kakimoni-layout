@@ -64,6 +64,8 @@
   }
   .btn-yellow  { background: #b45309; color: #fef3c7; }
   .btn-yellow:hover { background: #92400e; }
+  .btn-blue { background: #1d4ed8; color: #dbeafe; }
+  .btn-blue:hover { background: #1e40af; }
   .btn-slate   { background: #334155; color: #e2e8f0; }
   .btn-slate:hover { background: #475569; }
   .btn-green   { background: #15803d; color: #fff; }
@@ -142,7 +144,10 @@
   </div>
   <div class="field">
     <label>サーバーフォルダ（server.js がある場所）</label>
-    <input type="text" id="failoverServerRoot" placeholder="C:\\kakimoni\\kakimoni">
+    <div class="row" style="gap:8px">
+      <input type="text" id="failoverServerRoot" placeholder="C:\\kakimoni\\kakimoni">
+      <button class="btn btn-blue" id="btnBrowseFailoverRoot" style="flex:0 0 auto">参照</button>
+    </div>
   </div>
   <div class="row" style="gap:8px;align-items:flex-end">
     <div class="field" style="width:120px;flex:0 0 auto">
@@ -537,6 +542,14 @@ document.getElementById('btnStartFailover').addEventListener('click', async () =
     failoverServerStatus = result.status;
   }
   updateFailoverUi();
+});
+
+document.getElementById('btnBrowseFailoverRoot').addEventListener('click', async () => {
+  const current = (document.getElementById('failoverServerRoot').value || '').trim();
+  const picked = await ipcRenderer.invoke('pick-failover-server-root', { defaultPath: current });
+  if (!picked || !picked.ok) return;
+  document.getElementById('failoverServerRoot').value = picked.path;
+  localStorage.setItem('layout_failover_serverRoot', picked.path);
 });
 
 document.getElementById('btnStopFailover').addEventListener('click', async () => {
