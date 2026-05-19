@@ -11,6 +11,51 @@ let launcherWin = null;
 // 最大2画面分のウィンドウを管理
 const displayWins = [null, null];
 let controlWin = null;
+let failoverServerProc = null;
+let failoverServerState = {
+  running: false,
+  pid: null,
+  port: 3100,
+  serverRoot: '',
+  startedAt: null,
+  lastError: '',
+};
+
+function normalizePort(value, fallback = 3100) {
+  const n = parseInt(String(value || ''), 10);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) return fallback;
+  return n;
+}
+
+function guessDefaultServerRoot() {
+  const candidates = [
+    path.resolve(__dirname, '..', 'kakimoni'),
+    path.resolve(process.cwd(), '..', 'kakimoni'),
+    path.resolve(process.cwd(), 'kakimoni'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(path.join(c, 'server.js'))) return c;
+  }
+  return candidates[0];
+}
+
+function emitFailoverServerStatus() {
+  if (!launcherWin || launcherWin.isDestroyed()) return;
+  launcherWin.webContents.send('failover-server-status', { ...failoverServerState });
+}
+
+function stopFailoverServerInternal() {
+  if (!failoverServerProc) return false;
+  try {
+    failoverServerProc.kill();
+  } catch {}
+  failoverServerProc = null;
+  failoverServerState.running = false;
+  failoverServerState.pid = null;
+  failoverServerState.startedAt = null;
+  emitFailoverServerStatus();
+  return true;
+}
 
 function compareVersions(a, b) {
   const parsePart = (part) => {
@@ -179,6 +224,78 @@ ipcMain.handle('get-displays', () => {
 });
 
 ipcMain.handle('get-app-version', () => app.getVersion());
+
+ipcMain.handle('get-failover-server-defaults', () => {
+  const serverRoot = guessDefaultServerRoot();
+  return {
+    serverRoot,
+    port: failoverServerState.port || 3100,
+    serverJsExists: fs.existsSync(path.join(serverRoot, 'server.js')),
+  };
+});
+
+ipcMain.handle('get-failover-server-status', () => ({ ...failoverServerState }));
+
+ipcMain.handle('start-failover-server', async (event, payload = {}) => {
+  try {
+    if (failoverServerProc) {
+      return { ok: true, alreadyRunning: true, status: { ...failoverServerState } };
+    }
+
+    const serverRoot = path.resolve(String(payload.serverRoot || guessDefaultServerRoot()));
+    const serverJsPath = path.join(serverRoot, 'server.js');
+    const port = normalizePort(payload.port, failoverServerState.port || 3100);
+
+    if (!fs.existsSync(serverJsPath)) {
+      return { ok: false, error: `server.js が見つかりません: ${serverJsPath}` };
+    }
+
+    const proc = spawn('node', [serverJsPath], {
+      cwd: serverRoot,
+      env: { ...process.env, KAKIMONI_PORT: String(port) },
+      windowsHide: true,
+    });
+
+    proc.on('error', (err) => {
+      failoverServerState.lastError = err?.message || 'サブサーバー起動に失敗しました。';
+      failoverServerState.running = false;
+      failoverServerState.pid = null;
+      failoverServerState.startedAt = null;
+      failoverServerProc = null;
+      emitFailoverServerStatus();
+    });
+
+    proc.on('exit', (code) => {
+      failoverServerState.running = false;
+      failoverServerState.pid = null;
+      failoverServerState.startedAt = null;
+      if (code && code !== 0) {
+        failoverServerState.lastError = `サブサーバーが終了しました (code ${code})`;
+      }
+      failoverServerProc = null;
+      emitFailoverServerStatus();
+    });
+
+    failoverServerProc = proc;
+    failoverServerState = {
+      running: true,
+      pid: proc.pid || null,
+      port,
+      serverRoot,
+      startedAt: new Date().toISOString(),
+      lastError: '',
+    };
+    emitFailoverServerStatus();
+    return { ok: true, status: { ...failoverServerState } };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('stop-failover-server', async () => {
+  const stopped = stopFailoverServerInternal();
+  return { ok: true, stopped, status: { ...failoverServerState } };
+});
 
 // コントロール画面を開く／閉じる
 ipcMain.on('toggle-control', (event, { url }) => {
@@ -380,4 +497,7 @@ ipcMain.handle('download-layout-self-update-from-github', async (event, payload 
 });
 
 app.whenReady().then(createLauncher);
+app.on('before-quit', () => {
+  stopFailoverServerInternal();
+});
 app.on('window-all-closed', () => { app.quit(); });

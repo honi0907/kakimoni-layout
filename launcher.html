@@ -134,6 +134,29 @@
   <button class="btn btn-yellow" id="btnRefreshDisplays" style="flex-shrink:0">🖥 モニター更新</button>
 </div>
 
+<!-- サブサーバー（緊急用） -->
+<div class="section" style="padding:10px 12px">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <div class="section-title" style="margin:0">緊急用サブサーバー</div>
+    <div style="font-size:0.72rem;color:#64748b">レイアウト機で起動</div>
+  </div>
+  <div class="field">
+    <label>サーバーフォルダ（server.js がある場所）</label>
+    <input type="text" id="failoverServerRoot" placeholder="C:\\kakimoni\\kakimoni">
+  </div>
+  <div class="row" style="gap:8px;align-items:flex-end">
+    <div class="field" style="width:120px;flex:0 0 auto">
+      <label>ポート</label>
+      <input type="text" id="failoverPort" value="3100" placeholder="3100">
+    </div>
+    <button class="btn btn-green" id="btnStartFailover">起動</button>
+    <button class="btn btn-red" id="btnStopFailover" disabled>停止</button>
+    <button class="btn btn-slate" id="btnOpenFailoverWebui">WebUIを開く</button>
+  </div>
+  <div id="failoverWebuiHint" class="url-hint">WebUI: <span>http://localhost:3100/host</span></div>
+  <div id="failoverStatus" class="url-hint">状態: 停止中</div>
+</div>
+
 <!-- レイアウト機 更新 -->
 <div class="section" style="padding:10px 12px">
   <div class="row" style="justify-content:space-between;align-items:center">
@@ -207,6 +230,7 @@
 
 <script>
 const { ipcRenderer } = require('electron');
+const { shell } = require('electron');
 
 let displays = [];
 const slotOpen = [false, false];
@@ -214,6 +238,15 @@ const slotOpen = [false, false];
 const SLOT_GROUPS = ['slot1', 'slot2'];
 let pendingLayoutUpdate = null;
 let pendingGithubUpdate = null;
+
+let failoverServerStatus = {
+  running: false,
+  pid: null,
+  port: 3100,
+  serverRoot: '',
+  startedAt: null,
+  lastError: '',
+};
 
 ipcRenderer.invoke('get-app-version').then((v) => {
   const el = document.getElementById('layout-version');
@@ -444,6 +477,87 @@ ipcRenderer.on('display-status', (e, { slot, open }) => {
 // 起動時にモニター一覧取得
 refreshDisplays();
 refreshCurrentVersion();
+
+function buildFailoverHostUrl() {
+  const port = parseInt(document.getElementById('failoverPort').value || '3100', 10) || 3100;
+  return `http://localhost:${port}/host`;
+}
+
+function updateFailoverUi() {
+  const status = document.getElementById('failoverStatus');
+  const startBtn = document.getElementById('btnStartFailover');
+  const stopBtn = document.getElementById('btnStopFailover');
+  const openBtn = document.getElementById('btnOpenFailoverWebui');
+
+  const url = buildFailoverHostUrl();
+  document.getElementById('failoverWebuiHint').innerHTML = `WebUI: <span>${url}</span>`;
+
+  if (failoverServerStatus.running) {
+    status.textContent = `状態: 起動中 (PID ${failoverServerStatus.pid || '-'}) port ${failoverServerStatus.port}`;
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    openBtn.disabled = false;
+  } else {
+    const err = failoverServerStatus.lastError ? ` / ${failoverServerStatus.lastError}` : '';
+    status.textContent = `状態: 停止中${err}`;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    openBtn.disabled = false;
+  }
+}
+
+async function refreshFailoverStatus() {
+  const s = await ipcRenderer.invoke('get-failover-server-status');
+  if (s) failoverServerStatus = s;
+  updateFailoverUi();
+}
+
+async function initFailoverDefaults() {
+  const defaults = await ipcRenderer.invoke('get-failover-server-defaults');
+  const rootInput = document.getElementById('failoverServerRoot');
+  const portInput = document.getElementById('failoverPort');
+  const savedRoot = localStorage.getItem('layout_failover_serverRoot') || '';
+  const savedPort = localStorage.getItem('layout_failover_port') || '';
+
+  rootInput.value = savedRoot || defaults.serverRoot || '';
+  portInput.value = savedPort || String(defaults.port || 3100);
+  updateFailoverUi();
+}
+
+document.getElementById('btnStartFailover').addEventListener('click', async () => {
+  const serverRoot = (document.getElementById('failoverServerRoot').value || '').trim();
+  const port = parseInt(document.getElementById('failoverPort').value || '3100', 10) || 3100;
+  localStorage.setItem('layout_failover_serverRoot', serverRoot);
+  localStorage.setItem('layout_failover_port', String(port));
+
+  const result = await ipcRenderer.invoke('start-failover-server', { serverRoot, port });
+  if (!result?.ok) {
+    failoverServerStatus.lastError = result?.error || 'サブサーバー起動に失敗しました。';
+  } else if (result.status) {
+    failoverServerStatus = result.status;
+  }
+  updateFailoverUi();
+});
+
+document.getElementById('btnStopFailover').addEventListener('click', async () => {
+  await ipcRenderer.invoke('stop-failover-server');
+  await refreshFailoverStatus();
+});
+
+document.getElementById('btnOpenFailoverWebui').addEventListener('click', () => {
+  shell.openExternal(buildFailoverHostUrl());
+});
+
+document.getElementById('failoverPort').addEventListener('input', updateFailoverUi);
+
+ipcRenderer.on('failover-server-status', (e, status) => {
+  if (!status) return;
+  failoverServerStatus = status;
+  updateFailoverUi();
+});
+
+initFailoverDefaults();
+refreshFailoverStatus();
 </script>
 </body>
 </html>
