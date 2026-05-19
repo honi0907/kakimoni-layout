@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -122,7 +123,7 @@
 </style>
 </head>
 <body>
-<h2>📺 KakiMoni レイアウト専用機</h2>
+<h2>📺 KakiMoni レイアウト専用機 <span id="layout-version" style="font-size:0.75rem;color:#94a3b8;">v-</span></h2>
 
 <!-- サーバー接続先 -->
 <div class="section" style="flex-direction:row;align-items:flex-end;gap:8px;padding:10px 12px">
@@ -144,6 +145,19 @@
     <button class="btn btn-green" id="btnApplyUpdate" style="flex:1" disabled>更新して再起動</button>
   </div>
   <div id="updateStatus" class="url-hint">状態: 未確認</div>
+</div>
+
+<!-- レイアウト機 更新（GitHub） -->
+<div class="section" style="padding:10px 12px">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <div class="section-title" style="margin:0">レイアウト機 更新（GitHub Release）</div>
+    <div style="font-size:0.72rem;color:#64748b">repo: honi0907/kakimoni-layout</div>
+  </div>
+  <div class="row" style="gap:8px">
+    <button class="btn btn-slate" id="btnCheckGithubUpdate" style="flex:1">GitHub更新を確認</button>
+    <button class="btn btn-green" id="btnApplyGithubUpdate" style="flex:1" disabled>GitHub更新して再起動</button>
+  </div>
+  <div id="githubUpdateStatus" class="url-hint">状態: 未確認</div>
 </div>
 
 <!-- スロット 1 / 2：横並び -->
@@ -199,6 +213,12 @@ const slotOpen = [false, false];
 // スロット1 → slot1, スロット2 → slot2 に固定
 const SLOT_GROUPS = ['slot1', 'slot2'];
 let pendingLayoutUpdate = null;
+let pendingGithubUpdate = null;
+
+ipcRenderer.invoke('get-app-version').then((v) => {
+  const el = document.getElementById('layout-version');
+  if (el) el.textContent = `v${v || '-'}`;
+}).catch(() => {});
 
 // 前回設定を復元
 const saved = {
@@ -277,9 +297,8 @@ document.getElementById('btnRefreshDisplays').addEventListener('click', refreshD
 
 async function refreshCurrentVersion() {
   try {
-    // バージョン表示はメイン側の app.getVersion を使えないため、package.json を基準にする
-    const pkg = require('./package.json');
-    document.getElementById('updateVersionInfo').textContent = `現在: v${pkg.version || '-'}`;
+    const v = await ipcRenderer.invoke('get-app-version');
+    document.getElementById('updateVersionInfo').textContent = `現在: v${v || '-'}`;
   } catch {
     document.getElementById('updateVersionInfo').textContent = '現在: -';
   }
@@ -324,6 +343,60 @@ document.getElementById('btnApplyUpdate').addEventListener('click', async () => 
     fileName: pendingLayoutUpdate.fileName,
     downloadPath: pendingLayoutUpdate.downloadPath,
     sha256: pendingLayoutUpdate.sha256,
+  });
+  if (!dl || !dl.ok) {
+    statusEl.textContent = `状態: ダウンロード失敗 (${dl?.error || 'unknown error'})`;
+    applyBtn.disabled = false;
+    return;
+  }
+
+  statusEl.textContent = '状態: 更新適用中...';
+  const ap = await ipcRenderer.invoke('apply-layout-update', { downloadedPath: dl.downloadedPath });
+  if (!ap || !ap.ok) {
+    statusEl.textContent = `状態: 更新失敗 (${ap?.error || 'unknown error'})`;
+    applyBtn.disabled = false;
+    return;
+  }
+
+  statusEl.textContent = '状態: 再起動します...';
+});
+
+document.getElementById('btnCheckGithubUpdate').addEventListener('click', async () => {
+  const statusEl = document.getElementById('githubUpdateStatus');
+  const applyBtn = document.getElementById('btnApplyGithubUpdate');
+  pendingGithubUpdate = null;
+  applyBtn.disabled = true;
+  statusEl.textContent = '状態: GitHub更新を確認中...';
+
+  const result = await ipcRenderer.invoke('check-layout-self-update-from-github', {
+    repo: 'honi0907/kakimoni-layout',
+    assetPattern: 'setup',
+  });
+  if (!result || !result.ok) {
+    statusEl.textContent = `状態: 確認失敗 (${result?.error || 'unknown error'})`;
+    return;
+  }
+  if (!result.available) {
+    statusEl.textContent = `状態: 最新です (現在 ${result.currentVersion} / 最新 ${result.latestVersion})`;
+    return;
+  }
+
+  pendingGithubUpdate = result;
+  applyBtn.disabled = false;
+  statusEl.textContent = `状態: 更新あり ${result.currentVersion} -> ${result.latestVersion}`;
+});
+
+document.getElementById('btnApplyGithubUpdate').addEventListener('click', async () => {
+  if (!pendingGithubUpdate) return;
+
+  const statusEl = document.getElementById('githubUpdateStatus');
+  const applyBtn = document.getElementById('btnApplyGithubUpdate');
+  applyBtn.disabled = true;
+  statusEl.textContent = '状態: GitHub更新ファイルをダウンロード中...';
+
+  const dl = await ipcRenderer.invoke('download-layout-self-update-from-github', {
+    downloadUrl: pendingGithubUpdate.downloadUrl,
+    assetName: pendingGithubUpdate.assetName,
   });
   if (!dl || !dl.ok) {
     statusEl.textContent = `状態: ダウンロード失敗 (${dl?.error || 'unknown error'})`;

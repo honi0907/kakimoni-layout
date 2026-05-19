@@ -1,14 +1,36 @@
 {
   "name": "kakimoni-layout",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "KakiMoni レイアウト専用機アプリ",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-packager . KakiMoni_Layout --platform=win32 --arch=x64 --out=dist --overwrite --asar"
+    "build": "electron-builder --win nsis"
   },
   "devDependencies": {
     "electron": "^29.0.0",
-    "electron-packager": "^17.0.0"
+    "electron-builder": "^26.10.0"
+  },
+  "build": {
+    "appId": "jp.honi0907.kakimoni.layout",
+    "productName": "KakiMoni_Layout",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "signAndEditExecutable": false,
+      "artifactName": "KakiMoni_Layout-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

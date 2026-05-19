@@ -13,8 +13,12 @@ const displayWins = [null, null];
 let controlWin = null;
 
 function compareVersions(a, b) {
-  const pa = String(a || '0').split(/[._-]/).map(s => parseInt(s, 10) || 0);
-  const pb = String(b || '0').split(/[._-]/).map(s => parseInt(s, 10) || 0);
+  const parsePart = (part) => {
+    const m = String(part || '').match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  };
+  const pa = String(a || '0').split(/[._-]/).map(parsePart);
+  const pb = String(b || '0').split(/[._-]/).map(parsePart);
   const len = Math.max(pa.length, pb.length);
   for (let i = 0; i < len; i++) {
     const va = pa[i] || 0;
@@ -76,6 +80,72 @@ function sha256OfFile(filePath) {
   return h.digest('hex');
 }
 
+function toSafeRepo(input) {
+  const repo = String(input || '').trim();
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) return '';
+  return repo;
+}
+
+function githubRequestJson(urlString, token) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const lib = u.protocol === 'https:' ? https : http;
+    const headers = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'kakimoni-layout-updater',
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const req = lib.get(u, { headers }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const next = new URL(res.headers.location, urlString).toString();
+        res.resume();
+        return resolve(githubRequestJson(next, token));
+      }
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          return reject(new Error(`HTTP ${res.statusCode}: ${data.slice(0, 200)}`));
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error(`JSON parse error: ${e.message}`));
+        }
+      });
+    });
+    req.on('error', reject);
+  });
+}
+
+function downloadBinary(urlString, outputPath, token) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const lib = u.protocol === 'https:' ? https : http;
+    const headers = { 'User-Agent': 'kakimoni-layout-updater' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const req = lib.get(u, { headers }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const next = new URL(res.headers.location, urlString).toString();
+        res.resume();
+        return resolve(downloadBinary(next, outputPath, token));
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(`Download error ${res.statusCode}`));
+      }
+      const out = fs.createWriteStream(outputPath);
+      res.pipe(out);
+      out.on('finish', () => out.close(() => resolve(outputPath)));
+      out.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+}
+
 function createLauncher() {
   launcherWin = new BrowserWindow({
     width: 820,
@@ -107,6 +177,8 @@ ipcMain.handle('get-displays', () => {
     isPrimary: d.id === screen.getPrimaryDisplay().id,
   }));
 });
+
+ipcMain.handle('get-app-version', () => app.getVersion());
 
 // コントロール画面を開く／閉じる
 ipcMain.on('toggle-control', (event, { url }) => {
@@ -226,19 +298,12 @@ ipcMain.handle('apply-layout-update', async (event, { downloadedPath }) => {
       return { ok: false, error: '更新ファイルが見つかりません。' };
     }
 
-    const currentExePath = process.execPath;
-    const backupExePath = `${currentExePath}.bak`;
     const scriptPath = path.join(app.getPath('temp'), `kakimoni-layout-updater-${Date.now()}.cmd`);
     const script = [
       '@echo off',
       'setlocal',
       'timeout /t 2 /nobreak >nul',
-      `copy /y "${currentExePath}" "${backupExePath}" >nul`,
-      `copy /y "${downloadedPath}" "${currentExePath}" >nul`,
-      'if errorlevel 1 (',
-      `  copy /y "${backupExePath}" "${currentExePath}" >nul`,
-      ')',
-      `start "" "${currentExePath}"`,
+      `start "" "${downloadedPath}" /S`,
       `del /f /q "${downloadedPath}" >nul 2>nul`,
       `del /f /q "${scriptPath}" >nul 2>nul`,
       'endlocal',
@@ -248,6 +313,67 @@ ipcMain.handle('apply-layout-update', async (event, { downloadedPath }) => {
     spawn('cmd.exe', ['/c', scriptPath], { detached: true, stdio: 'ignore' }).unref();
     setTimeout(() => app.quit(), 100);
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('check-layout-self-update-from-github', async (event, payload = {}) => {
+  try {
+    const repo = toSafeRepo(payload.repo);
+    const releaseTag = String(payload.releaseTag || '').trim();
+    const token = String(payload.token || '').trim();
+    const assetPattern = String(payload.assetPattern || '').trim().toLowerCase();
+
+    if (!repo) return { ok: false, error: 'repo は owner/repo 形式で入力してください。' };
+
+    const apiUrl = releaseTag
+      ? `https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(releaseTag)}`
+      : `https://api.github.com/repos/${repo}/releases/latest`;
+    const release = await githubRequestJson(apiUrl, token || null);
+
+    const assets = Array.isArray(release.assets) ? release.assets : [];
+    const exeAssets = assets.filter(a => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe'));
+    if (exeAssets.length === 0) return { ok: false, error: 'Releaseに .exe アセットがありません。' };
+
+    let picked = null;
+    if (assetPattern) picked = exeAssets.find(a => a.name.toLowerCase().includes(assetPattern));
+    if (!picked) picked = exeAssets[0];
+    if (!picked.browser_download_url) return { ok: false, error: 'ダウンロードURLを取得できませんでした。' };
+
+    const currentVersion = app.getVersion();
+    const latestVersion = String(release.tag_name || release.name || '').trim();
+    if (!latestVersion) return { ok: false, error: 'Releaseのバージョン情報を取得できませんでした。' };
+    const available = compareVersions(latestVersion, currentVersion) > 0;
+
+    return {
+      ok: true,
+      available,
+      currentVersion,
+      latestVersion,
+      repo,
+      releaseTag: release.tag_name || '',
+      releaseUrl: release.html_url || '',
+      assetName: picked.name,
+      downloadUrl: picked.browser_download_url,
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('download-layout-self-update-from-github', async (event, payload = {}) => {
+  try {
+    const downloadUrl = String(payload.downloadUrl || '').trim();
+    const token = String(payload.token || '').trim();
+    const assetName = path.basename(String(payload.assetName || 'kakimoni-layout-update.exe'));
+    if (!downloadUrl) return { ok: false, error: 'downloadUrl が空です。' };
+
+    const tempName = `km-layout-self-${Date.now()}-${assetName}`;
+    const tempFilePath = path.join(app.getPath('temp'), tempName);
+    await downloadBinary(downloadUrl, tempFilePath, token || null);
+
+    return { ok: true, downloadedPath: tempFilePath };
   } catch (e) {
     return { ok: false, error: e.message };
   }
