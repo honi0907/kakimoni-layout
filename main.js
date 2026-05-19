@@ -44,6 +44,25 @@ function emitFailoverServerStatus() {
   launcherWin.webContents.send('failover-server-status', { ...failoverServerState });
 }
 
+function mapFailoverExitError(code, stderrText) {
+  const raw = String(stderrText || '').trim();
+  if (/EADDRINUSE/i.test(raw)) {
+    return 'ポートが使用中です。別ポートを指定するか既存サーバーを停止してください。';
+  }
+  if (/Cannot find module|MODULE_NOT_FOUND/i.test(raw)) {
+    return '依存パッケージ不足です。サブサーバーフォルダで npm install --omit=dev を実行してください。';
+  }
+  if (raw) {
+    const lines = raw.split(/\r?\n/).map((v) => v.trim()).filter(Boolean);
+    const tail = lines.slice(-2).join(' / ');
+    return `起動失敗: ${tail}`;
+  }
+  if (code && code !== 0) {
+    return `サブサーバーが終了しました (code ${code})`;
+  }
+  return 'サブサーバーが停止しました。';
+}
+
 function stopFailoverServerInternal() {
   if (!failoverServerProc) return false;
   try {
@@ -259,16 +278,34 @@ ipcMain.handle('start-failover-server', async (event, payload = {}) => {
     const serverRoot = path.resolve(String(payload.serverRoot || guessDefaultServerRoot()));
     const serverJsPath = path.join(serverRoot, 'server.js');
     const port = normalizePort(payload.port, failoverServerState.port || 3100);
+    const expressPath = path.join(serverRoot, 'node_modules', 'express');
 
     if (!fs.existsSync(serverJsPath)) {
       return { ok: false, error: `server.js が見つかりません: ${serverJsPath}` };
     }
+    if (!fs.existsSync(expressPath)) {
+      return {
+        ok: false,
+        error: '依存パッケージが未インストールです。サブサーバーフォルダで npm install --omit=dev を実行してください。',
+      };
+    }
+
+    let stderrBuf = '';
 
     const proc = spawn('node', [serverJsPath], {
       cwd: serverRoot,
       env: { ...process.env, KAKIMONI_PORT: String(port) },
       windowsHide: true,
     });
+
+    if (proc.stderr) {
+      proc.stderr.on('data', (chunk) => {
+        stderrBuf += String(chunk || '');
+        if (stderrBuf.length > 4000) {
+          stderrBuf = stderrBuf.slice(-4000);
+        }
+      });
+    }
 
     proc.on('error', (err) => {
       failoverServerState.lastError = err?.message || 'サブサーバー起動に失敗しました。';
@@ -283,9 +320,7 @@ ipcMain.handle('start-failover-server', async (event, payload = {}) => {
       failoverServerState.running = false;
       failoverServerState.pid = null;
       failoverServerState.startedAt = null;
-      if (code && code !== 0) {
-        failoverServerState.lastError = `サブサーバーが終了しました (code ${code})`;
-      }
+      failoverServerState.lastError = mapFailoverExitError(code, stderrBuf);
       failoverServerProc = null;
       emitFailoverServerStatus();
     });
