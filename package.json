@@ -1,6 +1,6 @@
 {
   "name": "kakimoni-layout",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "KakiMoni レイアウト専用機アプリ",
   "main": "main.js",
   "scripts": {

@@ -29,6 +29,9 @@ function normalizePort(value, fallback = 3100) {
 
 function guessDefaultServerRoot() {
   const candidates = [
+    path.resolve(__dirname, '..', 'server'),
+    path.resolve(process.cwd(), '..', 'server'),
+    path.resolve(process.cwd(), 'server'),
     path.resolve(__dirname, '..', 'kakimoni'),
     path.resolve(process.cwd(), '..', 'kakimoni'),
     path.resolve(process.cwd(), 'kakimoni'),

@@ -136,58 +136,6 @@
   <button class="btn btn-yellow" id="btnRefreshDisplays" style="flex-shrink:0">🖥 モニター更新</button>
 </div>
 
-<!-- サブサーバー（緊急用） -->
-<div class="section" style="padding:10px 12px">
-  <div class="row" style="justify-content:space-between;align-items:center">
-    <div class="section-title" style="margin:0">緊急用サブサーバー</div>
-    <div style="font-size:0.72rem;color:#64748b">レイアウト機で起動</div>
-  </div>
-  <div class="field">
-    <label>サーバーフォルダ（server.js がある場所）</label>
-    <div class="row" style="gap:8px">
-      <input type="text" id="failoverServerRoot" placeholder="C:\\kakimoni\\kakimoni">
-      <button class="btn btn-blue" id="btnBrowseFailoverRoot" style="flex:0 0 auto">参照</button>
-    </div>
-  </div>
-  <div class="row" style="gap:8px;align-items:flex-end">
-    <div class="field" style="width:120px;flex:0 0 auto">
-      <label>ポート</label>
-      <input type="text" id="failoverPort" value="3100" placeholder="3100">
-    </div>
-    <button class="btn btn-green" id="btnStartFailover">起動</button>
-    <button class="btn btn-red" id="btnStopFailover" disabled>停止</button>
-    <button class="btn btn-slate" id="btnOpenFailoverWebui">WebUIを開く</button>
-  </div>
-  <div id="failoverWebuiHint" class="url-hint">WebUI: <span>http://localhost:3100/host</span></div>
-  <div id="failoverStatus" class="url-hint">状態: 停止中</div>
-</div>
-
-<!-- レイアウト機 更新 -->
-<div class="section" style="padding:10px 12px">
-  <div class="row" style="justify-content:space-between;align-items:center">
-    <div class="section-title" style="margin:0">レイアウト機 更新（親サーバー配信）</div>
-    <div id="updateVersionInfo" style="font-size:0.72rem;color:#64748b">現在: -</div>
-  </div>
-  <div class="row" style="gap:8px">
-    <button class="btn btn-slate" id="btnCheckUpdate" style="flex:1">更新を確認</button>
-    <button class="btn btn-green" id="btnApplyUpdate" style="flex:1" disabled>更新して再起動</button>
-  </div>
-  <div id="updateStatus" class="url-hint">状態: 未確認</div>
-</div>
-
-<!-- レイアウト機 更新（GitHub） -->
-<div class="section" style="padding:10px 12px">
-  <div class="row" style="justify-content:space-between;align-items:center">
-    <div class="section-title" style="margin:0">レイアウト機 更新（GitHub Release）</div>
-    <div style="font-size:0.72rem;color:#64748b">repo: honi0907/kakimoni-layout</div>
-  </div>
-  <div class="row" style="gap:8px">
-    <button class="btn btn-slate" id="btnCheckGithubUpdate" style="flex:1">GitHub更新を確認</button>
-    <button class="btn btn-green" id="btnApplyGithubUpdate" style="flex:1" disabled>GitHub更新して再起動</button>
-  </div>
-  <div id="githubUpdateStatus" class="url-hint">状態: 未確認</div>
-</div>
-
 <!-- スロット 1 / 2：横並び -->
 <div id="slots-grid">
 
@@ -232,6 +180,62 @@
   </div>
   <button class="btn btn-teal" id="btnControl">📐 コントロール画面を開く</button>
 </div>
+
+<details class="section" style="padding:10px 12px">
+  <summary class="section-title" style="cursor:pointer">緊急用サブサーバー・更新（必要時のみ）</summary>
+
+  <!-- サブサーバー（緊急用） -->
+  <div class="section" style="padding:10px 12px;margin-top:8px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="section-title" style="margin:0">緊急用サブサーバー</div>
+      <div style="font-size:0.72rem;color:#64748b">レイアウト機で起動</div>
+    </div>
+    <div class="field">
+      <label>サーバーフォルダ（server.js がある場所）</label>
+      <div class="row" style="gap:8px">
+        <input type="text" id="failoverServerRoot" placeholder="C:\\kakimoni\\kakimoni">
+        <button class="btn btn-blue" id="btnBrowseFailoverRoot" style="flex:0 0 auto">参照</button>
+      </div>
+    </div>
+    <div class="row" style="gap:8px;align-items:flex-end">
+      <div class="field" style="width:120px;flex:0 0 auto">
+        <label>ポート</label>
+        <input type="text" id="failoverPort" value="3100" placeholder="3100">
+      </div>
+      <button class="btn btn-green" id="btnStartFailover">起動</button>
+      <button class="btn btn-red" id="btnStopFailover" disabled>停止</button>
+      <button class="btn btn-slate" id="btnOpenFailoverWebui">WebUIを開く</button>
+    </div>
+    <div id="failoverWebuiHint" class="url-hint">WebUI: <span>http://localhost:3100/host</span></div>
+    <div id="failoverStatus" class="url-hint">状態: 停止中</div>
+  </div>
+
+  <!-- レイアウト機 更新 -->
+  <div class="section" style="padding:10px 12px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="section-title" style="margin:0">レイアウト機 更新（親サーバー配信）</div>
+      <div id="updateVersionInfo" style="font-size:0.72rem;color:#64748b">現在: -</div>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-slate" id="btnCheckUpdate" style="flex:1">更新を確認</button>
+      <button class="btn btn-green" id="btnApplyUpdate" style="flex:1" disabled>更新して再起動</button>
+    </div>
+    <div id="updateStatus" class="url-hint">状態: 未確認</div>
+  </div>
+
+  <!-- レイアウト機 更新（GitHub） -->
+  <div class="section" style="padding:10px 12px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="section-title" style="margin:0">レイアウト機 更新（GitHub Release）</div>
+      <div style="font-size:0.72rem;color:#64748b">repo: honi0907/kakimoni-layout</div>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-slate" id="btnCheckGithubUpdate" style="flex:1">GitHub更新を確認</button>
+      <button class="btn btn-green" id="btnApplyGithubUpdate" style="flex:1" disabled>GitHub更新して再起動</button>
+    </div>
+    <div id="githubUpdateStatus" class="url-hint">状態: 未確認</div>
+  </div>
+</details>
 
 <script>
 const { ipcRenderer } = require('electron');
@@ -485,7 +489,21 @@ refreshCurrentVersion();
 
 function buildFailoverHostUrl() {
   const port = parseInt(document.getElementById('failoverPort').value || '3100', 10) || 3100;
-  return `http://localhost:${port}/host`;
+  return `http://localhost:${port}/host-v2`;
+}
+
+async function resolveFailoverHostUrl() {
+  const port = parseInt(document.getElementById('failoverPort').value || '3100', 10) || 3100;
+  const base = `http://localhost:${port}`;
+  const candidates = ['/host-v2', '/host/index-v2.html', '/host'];
+
+  for (const route of candidates) {
+    try {
+      const res = await fetch(`${base}${route}`, { method: 'HEAD', cache: 'no-store' });
+      if (res && res.ok) return `${base}${route}`;
+    } catch {}
+  }
+  return `${base}/host-v2`;
 }
 
 function updateFailoverUi() {
@@ -557,8 +575,9 @@ document.getElementById('btnStopFailover').addEventListener('click', async () =>
   await refreshFailoverStatus();
 });
 
-document.getElementById('btnOpenFailoverWebui').addEventListener('click', () => {
-  shell.openExternal(buildFailoverHostUrl());
+document.getElementById('btnOpenFailoverWebui').addEventListener('click', async () => {
+  const target = await resolveFailoverHostUrl();
+  shell.openExternal(target);
 });
 
 document.getElementById('failoverPort').addEventListener('input', updateFailoverUi);
