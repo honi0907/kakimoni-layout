@@ -1,10 +1,11 @@
 {
   "name": "kakimoni-layout",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "KakiMoni レイアウト専用機アプリ",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "prebuild": "node scripts/cleanup-dist.js",
     "build": "electron-builder --win nsis"
   },
   "devDependencies": {
